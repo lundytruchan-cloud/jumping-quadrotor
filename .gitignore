@@ -1,0 +1,38 @@
+# ROS2 / colcon
+build/
+install/
+log/
+.colcon/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.secret
+
+# 仿真产物
+*.bag
+*.db3
+*.sqlite3
+*.png
+*.mp4
+recordings/
+
+# IDE / 系统
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
