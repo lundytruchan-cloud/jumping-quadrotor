@@ -100,3 +100,18 @@ f_e = −k(l − l₀ − l_p) − sgn(l̇)·f_c   （l < l₀）
 
 - 论文数据与绘图代码：https://doi.org/10.5281/zenodo.10777420
 - 论文主页：https://www.science.org/doi/10.1126/scirobotics.adi8912
+
+## 9. Zenodo 代码包构成（已实际核验）
+
+共 10 个文件，全部是「按图对应的实验数据 + MATLAB 脚本」，不含控制器代码、固件或 CAD：
+
+| 压缩包 | 对应内容 | 对你的作用 |
+|---|---|---|
+| DropTest.zip（4.9 MB） | 高速视频 + `track_all.m`（KLT 特征跟踪） | 掉落实验参数辨识管线（k/m、f_c/m、l_p） |
+| StanceDynamics.zip（0.9 MB） | `run_this.m`、`evaluate_data.m`、`stance_transform`、符号推导 `.mlx` | 支撑阶段模型 + 着陆→离地映射（图 2C）核心 |
+| AerodynamicStabilizer.zip（0.2 MB） | `landing_to_landing.m`、结果 .mat | Poincaré 映射/稳定器稳定性分析（图 6） |
+| StabilityTests.zip（0.7 MB） | no_controller / no_damper / with_damper 原始数据 | 三种控制策略对比实验（图 6C） |
+| ExampleTrajectory.zip（1.5 KB） | `output_figure.m` | 样例出图脚本 |
+| AgilityEvaluation / TrajectoryTracking / HybridLocomotion / EnduranceTest | 大体积原始动捕/视频数据 | 性能基准：跳跃敏捷度、轨迹跟踪 RMSE、续航、混合机动（作为复现验收标准） |
+
+**关键结论**：代码给出的是「模型 + 数据 + 出图」，不是「控制器」。高层跳跃控制器（式 22–33）、低层姿态控制与推力分配（式 34–35）、稳定器控制逻辑都需要自己实现——这正是复现工作的核心。
