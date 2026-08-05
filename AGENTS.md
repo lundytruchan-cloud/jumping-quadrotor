@@ -3,8 +3,7 @@
 ## 项目状态
 
 - 全新 git 仓库，当前阶段目标：**四旋翼可跳跃飞行器复现**（学习项目，非全局目标）。
-- 技术栈：ROS2（Python/C++ 节点）、Gazebo 仿真、rviz2 可视化；控制算法（PID/LQR 等）仿真优先验证。
-- ROS2 发行版与 Gazebo 版本确定后，请回填下方「验证命令」的具体命令。
+- 技术栈：ROS2 Jazzy + Gazebo Harmonic（`ros-jazzy-ros-gz`，Gazebo Sim 8.x）（Python/C++ 节点）、rviz2 可视化；控制算法（PID/LQR 等）仿真优先验证。
 
 ## 工作流
 
@@ -31,10 +30,10 @@
 
 ## 验证命令
 
-> 待技术栈确定后回填，例如：
-> - 构建：`colcon build`
-> - 测试：`ros2 test` / `pytest`
-> - 启动仿真：`ros2 launch <package> <launch-file>`
+> 基于 WSL2 Ubuntu 24.04，先 `source /opt/ros/jazzy/setup.bash`，进入 `ros2_ws` 后另加 `source install/setup.bash`。
+- 构建：`colcon build`（在 `ros2_ws` 下执行）
+- 测试：`colcon test --packages-select <package>`，查看结果：`colcon test-result --verbose`
+- 启动仿真：`ros2 launch <package> <launch-file>`
 
 ## 安全与规范
 
