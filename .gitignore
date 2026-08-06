@@ -41,3 +41,9 @@ recordings/
 *.swp
 Thumbs.db
 .DS_Store
+
+# task4 figures (intentionally committed)
+!docs/data/task4_*.png
+
+# raw Zenodo data (downloaded on demand, not committed)
+/data/
