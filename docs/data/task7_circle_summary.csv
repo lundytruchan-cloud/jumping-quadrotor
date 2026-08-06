@@ -1,0 +1,8 @@
+metric,value,threshold,ok
+takeoffs,10,10,True
+landing_rmse_m,0.385,0.30,True
+segment_landings,6,,
+segment_rmse_m,0.139,,
+landing_max_err_m,0.987,,
+height_rmse_m,0.040,0.12,True
+overall,PASS,,

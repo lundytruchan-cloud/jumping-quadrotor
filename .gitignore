@@ -56,5 +56,9 @@ Thumbs.db
 !docs/data/task6_*.png
 !docs/data/task6_*.csv
 
+# task7 jumping-controller assets (intentionally committed)
+!docs/data/task7_*.png
+!docs/data/task7_*.csv
+
 # raw Zenodo data (downloaded on demand, not committed)
 /data/
