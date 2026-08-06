@@ -25,6 +25,8 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned   # 只需执行一次
 | `sim_demo.sh` | 电机起转演示 + CSV 记录 | `./sim_demo.sh 0.25 5 25` |
 | `sim_build.sh` | colcon 构建 + 测试 | `./sim_build.sh`；全工作空间：`./sim_build.sh all` |
 | `sim_photos.sh` | 无头渲染模型五视图到 `docs/data/task3_photos/` | `./sim_photos.sh` |
+| `sim_drop.sh` | 自由落体掉落仿真 + 阶段 CSV 记录 | `./sim_drop.sh 0.5 5` |
+| `sim_drop_photos.sh` | 无头渲染掉落截图（空中/最大压缩五视图） | `./sim_drop_photos.sh` |
 
 ## 注意事项
 

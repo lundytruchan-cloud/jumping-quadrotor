@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sim_build.sh - 构建并测试 quadcopter_description
+# sim_build.sh - 构建并测试 quadcopter_description + quadcopter_gz_plugins
 #
 # 用法:
 #   ./sim_build.sh        # 只构建并测试本包（快）
@@ -12,7 +12,7 @@ cd ros2_ws
 if [ "${1:-}" = "all" ]; then
   colcon build --symlink-install
 else
-  colcon build --packages-select quadcopter_description --symlink-install
+  colcon build --packages-select quadcopter_gz_plugins quadcopter_description --symlink-install
 fi
-colcon test --packages-select quadcopter_description
+colcon test --packages-select quadcopter_gz_plugins quadcopter_description
 colcon test-result --verbose

@@ -45,5 +45,12 @@ Thumbs.db
 # task4 figures (intentionally committed)
 !docs/data/task4_*.png
 
+# task5 drop-test assets (intentionally committed)
+!docs/task5_*.png
+!docs/data/task5_*.png
+!docs/data/task5_*.csv
+!docs/data/task5_photos/
+!docs/data/task5_photos/*.png
+
 # raw Zenodo data (downloaded on demand, not committed)
 /data/
