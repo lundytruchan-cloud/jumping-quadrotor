@@ -59,6 +59,21 @@ def first_support_segment(support):
     return idx[: int(split[0]) + 1]
 
 
+def support_segments(support, t, max_gap_samples=5):
+    """Return (start_t, end_t) of every support segment in the record."""
+    idx = np.flatnonzero(support)
+    if len(idx) == 0:
+        return []
+    segments = []
+    start = idx[0]
+    for i in range(1, len(idx)):
+        if idx[i] - idx[i - 1] > max_gap_samples:
+            segments.append((float(t[start]), float(t[idx[i - 1]])))
+            start = idx[i]
+    segments.append((float(t[start]), float(t[idx[-1]])))
+    return segments
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--csv', required=True, help='leg state CSV')
@@ -145,29 +160,33 @@ def main():
         writer.writerows(summary_rows)
     print('summary ->', summary_path)
 
-    # Plot.
+    # Plot the full record so every bounce is visible; the first support
+    # segment (used for the paper comparison) is marked explicitly.
     fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
-    window = (t >= t_ld - 0.10) & (t <= t_to + 0.15)
-    tw = t[window]
-    axes[0].plot(tw, com[window], label='body CoM')
-    axes[0].plot(tw, foot_z[window], label='foot')
-    axes[0].axvspan(t_ld, t_to, color='tab:orange', alpha=0.25, label='support')
+    segments = support_segments(support, t)
+    for seg_start, seg_end in segments:
+        axes[0].axvspan(
+            seg_start, seg_end, color='tab:orange', alpha=0.25,
+            label='support' if seg_start == segments[0][0] else None)
+    axes[0].plot(t, com, label='body CoM')
+    axes[0].plot(t, foot_z, label='foot')
     axes[0].axvline(t_ld, color='tab:red', ls='--', lw=1)
     axes[0].axvline(t_to, color='tab:red', ls='--', lw=1)
     axes[0].set_ylabel('height (m)')
     axes[0].legend(loc='upper right')
 
-    axes[1].plot(tw, (L0 + LP - (L0 + q[window])) * 100.0, color='tab:green')
+    stretch = (L0 + LP - (L0 + q)) * 100.0
+    axes[1].plot(t, stretch, color='tab:green')
     axes[1].axhline(4.7, color='gray', ls=':', lw=1)
     axes[1].axhline(5.5, color='gray', ls=':', lw=1)
     axes[1].set_ylabel('leg stretch (cm)')
-    axes[1].set_ylim(bottom=0)
+    axes[1].set_ylim(0.0, max(6.0, float(np.max(stretch)) * 1.1))
 
     phase_num = np.asarray([
         ['AERIAL', 'LANDING', 'SUPPORT', 'TAKEOFF'].index(p)
         for p in phase])
     axes[2].plot(t, phase_num, drawstyle='steps-post', color='tab:blue')
-    axes[2].plot(tw, force[window], color='tab:red', alpha=0.7)
+    axes[2].plot(t, force, color='tab:red', alpha=0.7)
     axes[2].set_yticks([0, 1, 2, 3])
     axes[2].set_yticklabels(['AERIAL', 'LANDING', 'SUPPORT', 'TAKEOFF'])
     axes[2].set_ylabel('phase / force (N)')
