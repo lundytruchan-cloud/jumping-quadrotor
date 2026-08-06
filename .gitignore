@@ -52,5 +52,9 @@ Thumbs.db
 !docs/data/task5_photos/
 !docs/data/task5_photos/*.png
 
+# task6 attitude-control assets (intentionally committed)
+!docs/data/task6_*.png
+!docs/data/task6_*.csv
+
 # raw Zenodo data (downloaded on demand, not committed)
 /data/
