@@ -8,6 +8,7 @@
     .\tools\sim.ps1 stop                       # 清理所有仿真进程
     .\tools\sim.ps1 status                     # 查看状态 / 多实例检查
     .\tools\sim.ps1 demo 0.25 5 25             # 电机起转演示 + 记录
+    .\tools\sim.ps1 attitude                    # 姿态控制验证（悬停/阶跃/零推力）
     .\tools\sim.ps1 build                      # 构建 + 测试
     .\tools\sim.ps1 photos                     # 模型五视图渲染
 
@@ -15,7 +16,7 @@
 #>
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('start', 'stop', 'status', 'demo', 'build', 'photos')]
+  [ValidateSet('start', 'stop', 'status', 'demo', 'build', 'photos', 'attitude')]
   [string]$Action,
   [string]$Extra = ''
 )

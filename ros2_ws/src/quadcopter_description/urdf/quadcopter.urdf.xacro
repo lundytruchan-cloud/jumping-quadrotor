@@ -52,10 +52,13 @@
                   value="${mass_total - 4.0 * mass_prop_link - foot_mass}"/>
   <xacro:property name="mass_prop_link" value="0.00275"/>
 
-  <!-- Motor model (approximate, to be calibrated in task 6) -->
+  <!-- Motor model (calibrated in task 6):
+       force = motor_constant * speed^2,  torque = moment_constant * force.
+       Hover needs ~2/3 max speed; moment_constant matches the Crazyflie
+       torque/thrust ratio (~0.006 m). -->
   <xacro:property name="max_rot_velocity" value="2200.0"/>
   <xacro:property name="motor_constant" value="3.0e-8"/>
-  <xacro:property name="moment_constant" value="3.0e-5"/>
+  <xacro:property name="moment_constant" value="0.006"/>
   <xacro:property name="time_constant_up" value="0.02"/>
   <xacro:property name="time_constant_down" value="0.04"/>
 
@@ -262,12 +265,14 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
+  <!-- Adjacent rotors spin in opposite directions so roll and yaw torques are
+       independent (standard X4 layout: CCW, CW, CCW, CW). -->
   <xacro:motor_prop idx="0" x="${motor_xy}" y="${motor_xy}"
                     yaw="${yaw_0}" turning="ccw"/>
   <xacro:motor_prop idx="1" x="${-motor_xy}" y="${motor_xy}"
-                    yaw="${yaw_1}" turning="ccw"/>
+                    yaw="${yaw_1}" turning="cw"/>
   <xacro:motor_prop idx="2" x="${-motor_xy}" y="${-motor_xy}"
-                    yaw="${yaw_2}" turning="cw"/>
+                    yaw="${yaw_2}" turning="ccw"/>
   <xacro:motor_prop idx="3" x="${motor_xy}" y="${-motor_xy}"
                     yaw="${yaw_3}" turning="cw"/>
 
@@ -312,6 +317,21 @@
       <update_frequency>20</update_frequency>
       <static_publisher>false</static_publisher>
     </plugin>
+  </gazebo>
+
+  <!-- IMU on the body: quaternion + angular velocity for the attitude loop -->
+  <gazebo reference="base_link">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>1</always_on>
+      <update_rate>500</update_rate>
+      <visualize>false</visualize>
+      <imu>
+        <orientation_reference_frame>ENU</orientation_reference_frame>
+      </imu>
+      <plugin
+        filename="gz-sim-imu-system"
+        name="gz::sim::systems::Imu"/>
+    </sensor>
   </gazebo>
 
 </robot>

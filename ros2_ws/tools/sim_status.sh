@@ -8,7 +8,7 @@ cd ros2_ws
 source install/setup.bash
 
 echo "=== 仿真进程 ==="
-ps -eo pid,lstart,cmd | grep -E "quadcopter_sim\.launch|gz sim -s -r.*quadcopter_world|gz sim -g -r|ros_gz_bridge/parameter_bridge /(world/)?quadcopter|robot_state_publisher --ros-args --params-file /tmp/launch_params|quadcopter_pose_tf|quadcopter_demo_node|rviz2 -d.*quadcopter" \
+ps -eo pid,lstart,cmd | grep -E "quadcopter_(sim|control)\.launch|gz sim -s -r.*quadcopter_world|gz sim -g -r|ros_gz_bridge/parameter_bridge /(world/)?quadcopter|robot_state_publisher --ros-args --params-file /tmp/launch_params|quadcopter_pose_tf|quadcopter_demo_node|attitude_control_node|attitude_setpoint_node|rviz2 -d.*quadcopter" \
   | grep -v grep || echo "（无相关进程）"
 
 SERVER_COUNT=$(ps -eo cmd | grep -E "gz sim -s -r.*quadcopter_world" | grep -v grep | wc -l)

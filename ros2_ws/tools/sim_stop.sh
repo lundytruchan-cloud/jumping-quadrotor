@@ -14,7 +14,7 @@ kill_by_pattern() {
   fi
 }
 
-kill_by_pattern "quadcopter_sim\.launch"
+kill_by_pattern "quadcopter_(sim|control)\.launch"
 kill_by_pattern "gz sim -s -r.*quadcopter_world"
 kill_by_pattern "gz sim -g -r"
 kill_by_pattern "ros_gz_bridge/parameter_bridge /world/quadcopter_world"
@@ -22,6 +22,8 @@ kill_by_pattern "ros_gz_bridge/parameter_bridge /model/quadcopter"
 kill_by_pattern "robot_state_publisher --ros-args --params-file /tmp/launch_params"
 kill_by_pattern "quadcopter_pose_tf"
 kill_by_pattern "quadcopter_demo_node"
+kill_by_pattern "attitude_control_node"
+kill_by_pattern "attitude_setpoint_node"
 kill_by_pattern "rviz2 -d.*quadcopter"
 
 sleep 1

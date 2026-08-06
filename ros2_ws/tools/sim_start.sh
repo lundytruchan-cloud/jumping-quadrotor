@@ -14,7 +14,7 @@ cd "$(dirname "$0")/../.."
 cd ros2_ws
 source install/setup.bash
 
-STALE=$(ps -eo cmd | grep -E "quadcopter_sim\.launch|gz sim -s -r.*quadcopter_world|quadcopter_pose_tf" \
+STALE=$(ps -eo cmd | grep -E "quadcopter_(sim|control)\.launch|gz sim -s -r.*quadcopter_world|quadcopter_pose_tf|attitude_control_node" \
   | grep -v grep | wc -l)
 if [ "$STALE" -gt 0 ]; then
   echo "[sim_start] 检测到已有仿真进程（$STALE 个），继续启动会造成多实例冲突。"

@@ -102,3 +102,27 @@ def test_gazebo_plugins_present():
     assert float(spring.find('f_c').text) == pytest.approx(0.442, abs=1e-4)
     assert float(spring.find('l_p').text) == 0.0197
     assert float(spring.find('l0').text) == 0.22
+
+
+def test_motor_turning_directions_alternate():
+    """Adjacent rotors must spin opposite ways (independent roll/yaw)."""
+    root = expand_xacro()
+    directions = []
+    for index in range(4):
+        matches = [
+            plugin for plugin in root.findall('gazebo/plugin')
+            if plugin.find('jointName') is not None
+            and plugin.find('jointName').text
+            == 'prop{}_joint'.format(index)
+        ]
+        assert len(matches) == 1
+        directions.append(matches[0].find('turningDirection').text)
+    assert directions == ['ccw', 'cw', 'ccw', 'cw']
+
+
+def test_imu_sensor_present():
+    root = expand_xacro()
+    sensor = root.find('gazebo[@reference="base_link"]/sensor')
+    assert sensor is not None
+    assert sensor.get('type') == 'imu'
+    assert sensor.find('update_rate') is not None

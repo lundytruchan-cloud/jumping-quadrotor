@@ -42,6 +42,10 @@ setup(
             'quadcopter_description.quadcopter_demo_node:main',
             'leg_phase_node = '
             'quadcopter_description.leg_phase_node:main',
+            'attitude_control_node = '
+            'quadcopter_description.attitude_control_node:main',
+            'attitude_setpoint_node = '
+            'quadcopter_description.attitude_setpoint_node:main',
         ],
     },
 )

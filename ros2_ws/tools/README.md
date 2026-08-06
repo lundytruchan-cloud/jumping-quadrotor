@@ -27,6 +27,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned   # 只需执行一次
 | `sim_photos.sh` | 无头渲染模型五视图到 `docs/data/task3_photos/` | `./sim_photos.sh` |
 | `sim_drop.sh` | 自由落体掉落仿真 + 阶段 CSV 记录 | `./sim_drop.sh 0.5 5` |
 | `sim_drop_photos.sh` | 无头渲染掉落截图（空中/最大压缩五视图） | `./sim_drop_photos.sh` |
+| `sim_attitude.sh` | 姿态控制验证：悬停 → 姿态阶跃 → 零推力弹道 + 指标/出图 | `./sim_attitude.sh 5 5 5`；加 `true` 参数可开 rviz2 |
 
 ## 注意事项
 
