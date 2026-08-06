@@ -12,6 +12,26 @@
 - 保持小粒度提交：一次提交只做一件事，提交信息写明动机。
 - 改动前先阅读本文件与 README，遵循仓库既有约定。
 
+## Shell 执行约定（重要）
+
+- **交互操作**：先 `wsl` 进入 Ubuntu 的 bash 再敲命令；不在 PowerShell 内联写复杂
+  Linux 命令（`$`、引号、分号、括号在 PowerShell → wsl → bash 三层传递中极易被
+  转义破坏，已多次踩坑）。
+- **脚本化操作**：Linux 命令一律写成 `ros2_ws/tools/*.sh`（用 apply_patch 创建，
+  保证 LF 行尾；不要用 here-string 管道或 Windows 编辑器，CRLF 会破坏 bash 脚本），
+  从仓库根目录以相对路径调用：`wsl -e bash -c "./ros2_ws/tools/xxx.sh"`（相对路径
+  天然避开 `New project` 空格问题）。
+- **固定脚本**：`sim_start.sh`（启动仿真）、`sim_stop.sh`（清理进程）、
+  `sim_status.sh`（状态/多实例检查）、`sim_demo.sh`（电机起转+记录）、
+  `sim_build.sh`（构建+测试）、`sim_photos.sh`（模型五视图渲染）；Windows 下可用
+  `ros2_ws/tools/sim.ps1 start|stop|status|demo|build|photos` 免转义调用
+  （首次需 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，或
+  `powershell -ExecutionPolicy Bypass -File ...` 绕过）。详见
+  `ros2_ws/tools/README.md`。
+- **已知坑**：不要同时启动两套仿真实例——同一 ROS 域下多实例各有独立仿真时钟，
+  rviz2 会反复输出 `Detected jump back in time. Clearing TF buffer.`；停止仿真用
+  Ctrl+C 让 launch 完整退出，或用 `sim_stop.sh` 清理。
+
 ## 图片与视频协作（重要）
 
 - 当前模型不支持图像输入（已实测验证）：无法直接查看图片、截图、视频。
