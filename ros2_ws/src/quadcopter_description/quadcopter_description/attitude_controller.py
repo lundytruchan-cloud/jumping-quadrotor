@@ -27,13 +27,16 @@ class AttitudePidController:
     """
 
     def __init__(self, kp_att=15.0, kp_rate=1.2e-3, ki_rate=1.0e-3,
-                 kd_rate=0.0, integral_limit=1.0e-2, max_torque=0.05):
+                 kd_rate=0.0, integral_limit=1.0e-2, max_torque=0.05,
+                 yaw_gain=1.0, yaw_rate_gain=1.0):
         self.kp_att = kp_att
         self.kp_rate = kp_rate
         self.ki_rate = ki_rate
         self.kd_rate = kd_rate
         self.integral_limit = integral_limit
         self.max_torque = max_torque
+        self.yaw_gain = yaw_gain
+        self.yaw_rate_gain = yaw_rate_gain
         self.reset()
 
     def reset(self):
@@ -52,11 +55,13 @@ class AttitudePidController:
         Returns (tau_x, tau_y, tau_z) in N*m.
         """
         e_rot = attitude_error(q_ref, q_cur)
+        e_rot = (e_rot[0], e_rot[1], e_rot[2] * self.yaw_gain)
         self.last_attitude_error = e_rot
 
         omega_des = [self.kp_att * e for e in e_rot]
         rate_error = [
             omega_des[i] - omega_body[i] for i in range(3)]
+        rate_error[2] *= self.yaw_rate_gain
 
         if self.ki_rate > 0.0:
             for i in range(3):

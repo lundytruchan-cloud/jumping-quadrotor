@@ -314,7 +314,7 @@
       name="gz::sim::systems::PosePublisher">
       <publish_model_pose>true</publish_model_pose>
       <publish_link_pose>false</publish_link_pose>
-      <update_frequency>20</update_frequency>
+      <update_frequency>100</update_frequency>
       <static_publisher>false</static_publisher>
     </plugin>
   </gazebo>

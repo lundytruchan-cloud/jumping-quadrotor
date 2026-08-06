@@ -59,6 +59,9 @@ class AttitudeControlNode(Node):
         self.declare_parameter('kd_rate', 0.0)
         self.declare_parameter('integral_limit', 1.0e-2)
         self.declare_parameter('max_torque', 0.05)
+        self.declare_parameter('att_only_torque_scale', 1.0)
+        self.declare_parameter('att_only_max_thrust', 0.25)
+        self.declare_parameter('att_only_yaw_gain', 0.0)
         self.declare_parameter('imu_timeout', 0.2)
         self.declare_parameter('altitude_hold', True)
         self.declare_parameter('alt_kp', 0.6)
@@ -72,6 +75,12 @@ class AttitudeControlNode(Node):
         self._mass = self.get_parameter('mass').value
         self._motor_constant = self.get_parameter('motor_constant').value
         self._max_speed = self.get_parameter('max_rot_velocity').value
+        self._att_only_torque_scale = self.get_parameter(
+            'att_only_torque_scale').value
+        self._att_only_max_thrust = self.get_parameter(
+            'att_only_max_thrust').value
+        self._att_only_yaw_gain = self.get_parameter(
+            'att_only_yaw_gain').value
         self._imu_timeout = self.get_parameter('imu_timeout').value
         self._altitude_hold = self.get_parameter('altitude_hold').value
         self._alt_kp = self.get_parameter('alt_kp').value
@@ -177,7 +186,7 @@ class AttitudeControlNode(Node):
 
     def _on_mode(self, msg):
         mode = msg.data.strip().lower()
-        if mode in ('hover', 'zero_thrust'):
+        if mode in ('hover', 'zero_thrust', 'attitude_only'):
             if mode != self._mode:
                 self.get_logger().info(
                     'control mode -> {} at t={:.3f}s'.format(
@@ -226,6 +235,24 @@ class AttitudeControlNode(Node):
         if self._mode == 'zero_thrust':
             torque = (0.0, 0.0, 0.0)
             thrust_desired = 0.0
+        elif self._mode == 'attitude_only':
+            # Ballistic segment: keep the attitude stabilised while the
+            # thrust stays at zero (paper Eq. 34-35 thrust management:
+            # "the rest of the time thrust ~= 0").
+            self._pid.yaw_gain = self._att_only_yaw_gain
+            self._pid.yaw_rate_gain = self._att_only_yaw_gain
+            torque = self._pid.update(
+                self._q_ref, self._q_cur, self._omega, dt)
+            self._pid.yaw_gain = 1.0
+            self._pid.yaw_rate_gain = 1.0
+            # With no base thrust the attitude-priority allocator would push
+            # motors to their limits for large errors and produce a net
+            # thrust (a "rocket" effect).  Scale the torque demand so it
+            # stays within the achievable differential range and cap the
+            # resulting net thrust afterwards.
+            torque = tuple(
+                self._att_only_torque_scale * t for t in torque)
+            thrust_desired = 0.0
         else:
             thrust_desired = self._mass * GRAVITY
             if self._altitude_hold and self._z_target is not None:
@@ -243,6 +270,14 @@ class AttitudeControlNode(Node):
                 self._q_ref, self._q_cur, self._omega, dt)
 
         result = self._allocator.allocate(thrust_desired, torque)
+        if (self._mode == 'attitude_only'
+                and result['thrust'] > self._att_only_max_thrust):
+            scale = self._att_only_max_thrust / result['thrust']
+            result = {
+                **result,
+                'f': [scale * f for f in result['f']],
+                'thrust': scale * result['thrust'],
+            }
         speeds = self._allocator.speeds_from_thrust(
             result['f'], self._motor_constant, self._max_speed)
         self._publish_speeds(speeds)
@@ -263,7 +298,11 @@ class AttitudeControlNode(Node):
             float(error[0]), float(error[1]), float(error[2]),
             float(torque[0]), float(torque[1]), float(torque[2]),
             float(thrust_desired), float(result['thrust']),
-            1.0 if self._mode == 'hover' else 0.0,
+            {
+                'hover': 1.0,
+                'zero_thrust': 0.0,
+                'attitude_only': 2.0,
+            }.get(self._mode, 0.0),
         ]
         self._diag_pub.publish(msg)
 

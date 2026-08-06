@@ -46,6 +46,8 @@ setup(
             'quadcopter_description.attitude_control_node:main',
             'attitude_setpoint_node = '
             'quadcopter_description.attitude_setpoint_node:main',
+            'jump_control_node = '
+            'quadcopter_description.jump_control_node:main',
         ],
     },
 )
