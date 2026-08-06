@@ -141,11 +141,16 @@ class QuadcopterDemoNode(Node):
         self._current_speed = speed
         self._command(speed)
         if self._finished:
-            self.get_logger().info('Demo finished')
-            self.destroy_timer(self._timer)
-            if self._csv_file is not None:
-                self._csv_file.close()
-                self._csv_writer = None
+            self._finish()
+
+    def _finish(self):
+        """Stop the demo and let the node shut down cleanly."""
+        if self._csv_file is not None:
+            self._csv_file.close()
+            self._csv_writer = None
+        self.destroy_timer(self._timer)
+        self.get_logger().info('Demo finished')
+        threading.Thread(target=rclpy.shutdown, daemon=True).start()
 
     def _log(self, speed):
         if self._csv_writer is None:
@@ -186,7 +191,8 @@ def main(args=None):
     finally:
         node.stop_motors()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
