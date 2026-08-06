@@ -30,6 +30,11 @@ venv/
 *.mp4
 recordings/
 
+# 任务三有意提交的截图与渲染图（豁免 *.png）
+!docs/task3_*.png
+!docs/data/task3_photos/
+!docs/data/task3_photos/*.png
+
 # IDE / 系统
 .idea/
 .vscode/
