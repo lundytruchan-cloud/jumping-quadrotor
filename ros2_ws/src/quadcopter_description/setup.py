@@ -40,6 +40,8 @@ setup(
             'quadcopter_description.quadcopter_pose_tf:main',
             'quadcopter_demo_node = '
             'quadcopter_description.quadcopter_demo_node:main',
+            'leg_phase_node = '
+            'quadcopter_description.leg_phase_node:main',
         ],
     },
 )

@@ -37,8 +37,19 @@
   <xacro:property name="arm_radius" value="0.002"/>
   <xacro:property name="motor_z" value="${body_z / 2.0 + motor_height / 2.0}"/>
 
-  <!-- Mass (kg); total = 0.027 -->
-  <xacro:property name="mass_base" value="0.016"/>
+  <!-- Hopcopter passive telescopic leg (paper Eq. 7 / table S2) -->
+  <xacro:property name="leg_length0" value="0.22"/>
+  <xacro:property name="leg_preload" value="0.0197"/>
+  <xacro:property name="mass_total" value="0.0348"/>
+  <xacro:property name="foot_mass" value="0.001"/>
+  <xacro:property name="k_over_m" value="5000.0"/>
+  <xacro:property name="f_c_over_m" value="12.7"/>
+  <xacro:property name="spring_k" value="${k_over_m * mass_total}"/>
+  <xacro:property name="spring_f_c" value="${f_c_over_m * mass_total}"/>
+
+  <!-- Mass (kg); total = 0.0348 = base + 4 props + foot -->
+  <xacro:property name="mass_base"
+                  value="${mass_total - 4.0 * mass_prop_link - foot_mass}"/>
   <xacro:property name="mass_prop_link" value="0.00275"/>
 
   <!-- Motor model (approximate, to be calibrated in task 6) -->
@@ -207,6 +218,50 @@
                        y="${body_y}" z="${body_z}"/>
   </link>
 
+  <!-- Central monopedal telescopic leg: foot_link slides along body z.
+       q = 0 corresponds to the rest length l0 = 0.22 m (mechanical stop);
+       compression moves the foot towards the body (q < 0). -->
+  <link name="foot_link">
+    <visual name="leg_rod">
+      <origin xyz="0 0 ${leg_length0 / 2.0}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${leg_radius}" length="${leg_length0}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <visual name="foot_tip">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.004"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+    <collision name="foot_tip">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.004"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${foot_mass}"/>
+      <inertia
+        ixx="${0.4 * foot_mass * 0.004 * 0.004}"
+        ixy="0.0" ixz="0.0"
+        iyy="${0.4 * foot_mass * 0.004 * 0.004}"
+        iyz="0.0"
+        izz="${0.4 * foot_mass * 0.004 * 0.004}"/>
+    </inertial>
+  </link>
+
+  <joint name="leg_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="foot_link"/>
+    <origin xyz="0 0 ${-leg_length0}" rpy="0 0 0"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-0.16" upper="0.0" effort="100.0" velocity="10.0"/>
+    <dynamics damping="0.0" friction="0.0"/>
+  </joint>
+
   <xacro:motor_prop idx="0" x="${motor_xy}" y="${motor_xy}"
                     yaw="${yaw_0}" turning="ccw"/>
   <xacro:motor_prop idx="1" x="${-motor_xy}" y="${motor_xy}"
@@ -221,11 +276,29 @@
     <plugin
       filename="gz-sim-joint-state-publisher-system"
       name="gz::sim::systems::JointStatePublisher">
-      <update_rate>50</update_rate>
+      <update_rate>500</update_rate>
       <joint_name>prop0_joint</joint_name>
       <joint_name>prop1_joint</joint_name>
       <joint_name>prop2_joint</joint_name>
       <joint_name>prop3_joint</joint_name>
+      <joint_name>leg_joint</joint_name>
+    </plugin>
+  </gazebo>
+
+  <!-- Passive spring-damper leg (paper Eq. 7, custom gz-sim system plugin).
+       Forces are applied at the physics rate; state is published at 1 kHz. -->
+  <gazebo>
+    <plugin
+      filename="libspring_damper_leg_system.so"
+      name="quadcopter_gz_plugins::SpringDamperLegSystem">
+      <leg_joint>leg_joint</leg_joint>
+      <foot_link>foot_link</foot_link>
+      <k>${spring_k}</k>
+      <f_c>${spring_f_c}</f_c>
+      <l_p>${leg_preload}</l_p>
+      <l0>${leg_length0}</l0>
+      <vel_eps>0.02</vel_eps>
+      <topic>/model/quadcopter/leg_state</topic>
     </plugin>
   </gazebo>
 

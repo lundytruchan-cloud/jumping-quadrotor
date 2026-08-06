@@ -18,9 +18,11 @@ import os
 import subprocess
 import tempfile
 
+from ament_index_python.packages import get_package_prefix
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
+    AppendEnvironmentVariable,
     DeclareLaunchArgument,
     ExecuteProcess,
     OpaqueFunction,
@@ -35,13 +37,20 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 package_name = 'quadcopter_description'
+plugins_package = 'quadcopter_gz_plugins'
+#: Rest length of the central telescopic leg (foot tip to body centre).
+LEG_L0 = 0.22
 
 
 def _convert_and_spawn(context):
     """Expand xacro to URDF, convert to SDF and create the model in Gazebo."""
     package_share = get_package_share_directory(package_name)
     xacro_path = os.path.join(package_share, 'urdf', 'quadcopter.urdf.xacro')
-    spawn_z = float(context.launch_configurations['spawn_z'])
+    drop_height = float(context.launch_configurations['drop_height'])
+    if drop_height > 0.0:
+        spawn_z = drop_height + LEG_L0
+    else:
+        spawn_z = float(context.launch_configurations['spawn_z'])
     namespace = context.launch_configurations['namespace']
 
     with tempfile.TemporaryDirectory(prefix='quadcopter_spawn_') as tmp:
@@ -112,8 +121,14 @@ def generate_launch_description():
         description='Model name used to spawn and for topic names',
     )
     declare_spawn_z = DeclareLaunchArgument(
-        'spawn_z', default_value='0.041',
-        description='Initial height so the legs rest on the ground',
+        'spawn_z', default_value='0.22',
+        description='Body height so the central leg rests on the ground',
+    )
+    declare_drop_height = DeclareLaunchArgument(
+        'drop_height', default_value='0.0',
+        description=(
+            'Initial foot height above the ground for a free-fall drop; '
+            '0 disables the drop and spawns on the ground'),
     )
     declare_gui = DeclareLaunchArgument(
         'gui', default_value='true',
@@ -127,6 +142,11 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     gui = LaunchConfiguration('gui')
     rviz = LaunchConfiguration('rviz')
+
+    gz_plugins_path = os.path.join(
+        get_package_prefix(plugins_package), 'lib')
+    set_gz_plugin_path = AppendEnvironmentVariable(
+        'GZ_SIM_SYSTEM_PLUGIN_PATH', gz_plugins_path)
 
     gazebo_server = ExecuteProcess(
         cmd=['gz', 'sim', '-s', '-r', world, '-v', '3'],
@@ -184,6 +204,19 @@ def generate_launch_description():
         output='screen',
     )
 
+    leg_state_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/model/quadcopter/leg_state'
+            '@ros_gz_interfaces/msg/Float32Array[gz.msgs.Float_V',
+        ],
+        remappings=[
+            ('/model/quadcopter/leg_state', '/quadcopter/leg_state'),
+        ],
+        output='screen',
+    )
+
     pose_tf = Node(
         package=package_name,
         executable='quadcopter_pose_tf',
@@ -213,14 +246,17 @@ def generate_launch_description():
         declare_world,
         declare_namespace,
         declare_spawn_z,
+        declare_drop_height,
         declare_gui,
         declare_rviz,
+        set_gz_plugin_path,
         gazebo_server,
         TimerAction(period=1.0, actions=[gazebo_gui]),
         spawn_entity,
         clock_bridge,
         joint_state_bridge,
         pose_bridge,
+        leg_state_bridge,
         robot_state_publisher,
         pose_tf,
         rviz_node,

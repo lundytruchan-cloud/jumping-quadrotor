@@ -18,6 +18,8 @@ import os
 import subprocess
 import xml.etree.ElementTree as ET
 
+import pytest
+
 
 ROBOT_DIR = os.path.join(os.path.dirname(__file__), '..', 'urdf')
 XACRO_PATH = os.path.join(ROBOT_DIR, 'quadcopter.urdf.xacro')
@@ -35,8 +37,8 @@ def test_robot_structure():
     assert root.get('name') == 'quadcopter'
     links = root.findall('link')
     joints = root.findall('joint')
-    assert len(links) == 5
-    assert len(joints) == 4
+    assert len(links) == 6
+    assert len(joints) == 5
     for index in range(4):
         joint = root.find('joint[@name="prop{}_joint"]'.format(index))
         assert joint is not None
@@ -46,6 +48,15 @@ def test_robot_structure():
         axis = joint.find('axis')
         assert axis is not None
         assert axis.get('xyz') == '0 0 1'
+    leg_joint = root.find('joint[@name="leg_joint"]')
+    assert leg_joint is not None
+    assert leg_joint.get('type') == 'prismatic'
+    assert leg_joint.find('parent').get('link') == 'base_link'
+    assert leg_joint.find('child').get('link') == 'foot_link'
+    assert leg_joint.find('axis').get('xyz') == '0 0 -1'
+    limits = leg_joint.find('limit')
+    assert float(limits.get('lower')) == -0.16
+    assert float(limits.get('upper')) == 0.0
 
 
 def test_crazyflie_mass():
@@ -53,7 +64,7 @@ def test_crazyflie_mass():
     total_mass = sum(
         float(link.find('inertial/mass').get('value'))
         for link in root.findall('link'))
-    assert abs(total_mass - 0.027) < 1e-6
+    assert abs(total_mass - 0.0348) < 1e-6
 
 
 def test_crazyflie_geometry():
@@ -77,6 +88,17 @@ def test_gazebo_plugins_present():
     joint_plugins = [
         plugin for plugin in root.findall('gazebo/plugin')
         if 'JointStatePublisher' in plugin.get('name')]
+    spring_plugins = [
+        plugin for plugin in root.findall('gazebo/plugin')
+        if 'SpringDamperLegSystem' in plugin.get('name')]
     assert len(motor_plugins) == 4
     assert len(joint_plugins) == 1
-    assert len(joint_plugins[0].findall('joint_name')) == 4
+    assert len(joint_plugins[0].findall('joint_name')) == 5
+    assert len(spring_plugins) == 1
+    spring = spring_plugins[0]
+    assert spring.find('leg_joint').text == 'leg_joint'
+    assert spring.find('foot_link').text == 'foot_link'
+    assert float(spring.find('k').text) == 174.0
+    assert float(spring.find('f_c').text) == pytest.approx(0.442, abs=1e-4)
+    assert float(spring.find('l_p').text) == 0.0197
+    assert float(spring.find('l0').text) == 0.22
