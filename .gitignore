@@ -67,5 +67,10 @@ Thumbs.db
 # stabilizer_active column of the jump CSV)
 docs/data/task8_*_stabilizer.csv
 
+# task9 performance-benchmark assets (intentionally committed)
+!docs/data/task9_*.png
+# raw leg-state telemetry (large, regenerable; jump/attitude CSVs suffice)
+docs/data/task9_*_leg.csv
+
 # raw Zenodo data (downloaded on demand, not committed)
 /data/
