@@ -59,6 +59,10 @@ from hopcopter_model.jump_planner import (  # noqa: E402
     solve_landing_attitude,
 )
 from hopcopter_model.params import PAPER_PARAMS  # noqa: E402
+from hopcopter_model.stabilizer import (  # noqa: E402
+    descent_control_mode,
+    stabilizer_active,
+)
 import numpy as np  # noqa: E402
 
 from .phase_machine import LegPhase, PhaseStateMachine  # noqa: E402
@@ -75,6 +79,7 @@ class ControllerOutput:
     z_b: np.ndarray
     high_state: str
     hop_count: int
+    stabilizer_active: bool
 
 
 def quaternion_from_z_axis(z_b, yaw=0.0):
@@ -115,7 +120,12 @@ class JumpController:
                  max_tilt_deg=18.0, tilt_scale=1.0, fb_gain=0.0,
                  fb_clamp=0.25, fixed_tilt_deg=0.0, max_speed=1.5,
                  max_step=0.25, rotation_time=0.25, ramp_hops=3,
-                 adaptive_scale=True):
+                 adaptive_scale=True, control_strategy='combined',
+                 position_feedback=True, no_fb_dt_pa=None):
+        if control_strategy not in ('attitude_only', 'stabilizer_only',
+                                    'combined'):
+            raise ValueError(
+                'unknown control_strategy: {!r}'.format(control_strategy))
         self.desired_height = float(desired_height)
         self.l0 = float(l0)
         self.g = float(g)
@@ -135,6 +145,10 @@ class JumpController:
         self.rotation_time = float(rotation_time)
         self.ramp_hops = int(ramp_hops)
         self.adaptive_scale = bool(adaptive_scale)
+        self.control_strategy = control_strategy
+        self.position_feedback = bool(position_feedback)
+        self.no_fb_dt_pa = (
+            float(no_fb_dt_pa) if no_fb_dt_pa is not None else None)
 
         def default_plan(p_apex, v_apex, p_des, z_d):
             return solve_landing_attitude(
@@ -169,6 +183,8 @@ class JumpController:
         self._landing_ref_k = None
         self._plan_des = None
         self._preland_time = None
+        self._t_apex_est = None
+        self._vz_no_fb_est = 0.0
         self._pending_rows = []
 
     @property
@@ -197,7 +213,7 @@ class JumpController:
         self._prev_leg_phase = leg_phase
 
         if (prev == LegPhase.TAKEOFF and leg_phase == LegPhase.AERIAL):
-            self._on_takeoff(t, p)
+            self._on_takeoff(t, p, q_dot)
         if (prev == LegPhase.AERIAL
                 and leg_phase in (LegPhase.LANDING, LegPhase.SUPPORT)):
             self._on_landing(t, p)
@@ -214,35 +230,50 @@ class JumpController:
                 mode = 'attitude_only'
         elif self._state == 'ASCENT_BALLISTIC':
             mode = 'attitude_only'
-            self._track_apex(t, p)
-            if self._apex_confirmed:
-                self._on_apex(t, p, v_xy)
+            if self.position_feedback:
+                self._track_apex(t, p)
+                if self._apex_confirmed:
+                    self._on_apex(t, p, v_xy)
+                    self._state = 'DESCENT'
+            elif self._t_apex_est is not None and t >= self._t_apex_est:
                 self._state = 'DESCENT'
         elif self._state == 'DESCENT':
-            mode = 'attitude_only'
-            if (self._t_land_pred is not None
-                    and t >= self._t_land_pred - self.pre_landing_lead):
-                self._state = 'PRE_LAND'
-                self._preland_time = t
+            mode = descent_control_mode(self.control_strategy,
+                                        self._state)
+            if self.position_feedback:
+                if (self._t_land_pred is not None
+                        and t >= self._t_land_pred - self.pre_landing_lead):
+                    self._state = 'PRE_LAND'
+                    self._preland_time = t
+                    z_b = self._commanded_landing_attitude(t)
+                elif (self._t_land_pred is None
+                        and leg_phase in (LegPhase.LANDING,
+                                          LegPhase.SUPPORT)):
+                    self._state = 'STANCE'
+            else:
                 z_b = self._commanded_landing_attitude(t)
-            elif (self._t_land_pred is None
-                    and leg_phase in (LegPhase.LANDING, LegPhase.SUPPORT)):
-                self._state = 'STANCE'
         elif self._state == 'PRE_LAND':
-            mode = 'attitude_only'
+            mode = descent_control_mode(self.control_strategy,
+                                        self._state)
             z_b = self._commanded_landing_attitude(t)
         elif self._state == 'STANCE':
             z_b = self._commanded_landing_attitude(t)
 
+        # The mode/stabilizer decision must reflect the state after the
+        # transitions above (e.g. the tick that enters DESCENT).
+        mode = descent_control_mode(self.control_strategy, self._state)
+        stabilizer_on = stabilizer_active(self.control_strategy,
+                                          self._state)
         return ControllerOutput(
             t=float(t),
             mode=mode,
             z_b=np.array(z_b, dtype=float),
             high_state=self._state,
             hop_count=self._hop_count,
+            stabilizer_active=bool(stabilizer_on),
         )
 
-    def _on_takeoff(self, t, p):
+    def _on_takeoff(self, t, p, q_dot=0.0):
         self._hop_count += 1
         self._takeoff_time = t
         self._takeoff_z = float(p[2])
@@ -257,16 +288,42 @@ class JumpController:
         self._plan = None
         self._plan_des = None
         self._t_land_pred = None
+        self._t_apex_est = None
 
-        v_est = self._vz_cycle_est
-        base = powered_ascent_duration(
-            v_est, self.desired_height, self.g)
-        # The simulated motors need ~3 time constants to reach hover speed;
-        # add a compensation so the energy burst is not lost in spin-up.
-        self._dt_pa = min(
-            self.max_dt_pa,
-            base + (self.spin_up_comp if base > 0.0 else 0.0),
-        )
+        if self.position_feedback:
+            v_est = self._vz_cycle_est
+            base = powered_ascent_duration(
+                v_est, self.desired_height, self.g)
+            # The simulated motors need ~3 time constants to reach hover
+            # speed; add a compensation so the burst is not lost in spin-up.
+            self._dt_pa = min(
+                self.max_dt_pa,
+                base + (self.spin_up_comp if base > 0.0 else 0.0),
+            )
+        else:
+            # No position/velocity feedback: use the nominal takeoff speed
+            # for the desired height, corrected by onboard measurements:
+            # the leg-extension speed at takeoff (q_dot, contact/encoder
+            # based) with a cycle-time fallback.  No position is used.
+            v_meas = max(0.0, float(q_dot))
+            if v_meas > 0.3:
+                self._vz_no_fb_est = (
+                    0.5 * self._vz_no_fb_est + 0.5 * min(v_meas, 6.0))
+            v_est = (
+                self._vz_no_fb_est
+                if self._vz_no_fb_est > 0.0
+                else np.sqrt(2.0 * self.g * self.desired_height))
+            if self.no_fb_dt_pa is not None:
+                self._dt_pa = min(self.max_dt_pa, self.no_fb_dt_pa)
+            else:
+                base = powered_ascent_duration(
+                    v_est, self.desired_height, self.g)
+                self._dt_pa = min(
+                    self.max_dt_pa,
+                    base + (self.spin_up_comp if base > 0.0 else 0.0),
+                )
+            self._t_apex_est = (
+                t + self._dt_pa + v_est / self.g)
         self._pending_rows.append({
             'type': 'cycle',
             'cycle': self._hop_count,
@@ -400,6 +457,17 @@ class JumpController:
     def _on_landing(self, t, p):
         if self._state in ('PRE_LAND', 'DESCENT'):
             self._state = 'STANCE'
+        if (not self.position_feedback
+                and self._takeoff_time is not None):
+            # Back out the effective takeoff speed from the measured cycle
+            # time: T ~= dt_PA + 2*vz/g for a ballistic return to the same
+            # height.  This keeps the open-loop apex/descent timing matched
+            # to the real jump (no position feedback is involved).
+            period = float(t - self._takeoff_time)
+            vz = 0.5 * self.g * (period - self._dt_pa)
+            if 0.5 < vz < 6.0:
+                self._vz_no_fb_est = (
+                    0.7 * self._vz_no_fb_est + 0.3 * vz)
         err_xy = float('nan')
         err_ref = float('nan')
         if self._plan is not None:

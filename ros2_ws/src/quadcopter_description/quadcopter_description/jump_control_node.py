@@ -24,7 +24,7 @@ import rclpy
 from rclpy.node import Node
 from ros_gz_interfaces.msg import Float32Array
 from rosgraph_msgs.msg import Clock
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 
 from .jump_controller import JumpController, quaternion_from_z_axis
 
@@ -41,6 +41,7 @@ CSV_COLUMNS = [
     't_landing', 'p_land_x', 'p_land_y', 'p_land_z', 'err_xy_pred',
     'err_ref', 'tilt_corr_x', 'tilt_corr_y',
     'tilt_scale',
+    'stabilizer_active',
     'error',
 ]
 
@@ -89,6 +90,10 @@ class JumpControlNode(Node):
         self.declare_parameter('rotation_time', 0.25)
         self.declare_parameter('ramp_hops', 3)
         self.declare_parameter('adaptive_scale', True)
+        self.declare_parameter('control_strategy', 'combined')
+        self.declare_parameter('position_feedback', True)
+        self.declare_parameter('no_fb_dt_pa', 0.0)
+        self.declare_parameter('stabilizer_cmd_topic', '/quadcopter/stabilizer_cmd')
         self.declare_parameter('l0', 0.22)
         self.declare_parameter('g', 9.80665)
         self.declare_parameter('log_file', '')
@@ -148,6 +153,9 @@ class JumpControlNode(Node):
             rotation_time=self.get_parameter('rotation_time').value,
             ramp_hops=self.get_parameter('ramp_hops').value,
             adaptive_scale=self.get_parameter('adaptive_scale').value,
+            control_strategy=self.get_parameter('control_strategy').value,
+            position_feedback=self.get_parameter('position_feedback').value,
+            no_fb_dt_pa=self.get_parameter('no_fb_dt_pa').value or None,
             ref_fn=ref_fn,
         )
 
@@ -155,12 +163,17 @@ class JumpControlNode(Node):
             QuaternionStamped, self.get_parameter('setpoint_topic').value, 10)
         self._mode_pub = self.create_publisher(
             String, self.get_parameter('mode_topic').value, 10)
+        self._stabilizer_pub = self.create_publisher(
+            Bool, self.get_parameter('stabilizer_cmd_topic').value, 10)
         self._done_pub = self.create_publisher(
             String, self.get_parameter('done_topic').value, 1)
 
-        self._pose_sub = self.create_subscription(
-            PoseStamped, self.get_parameter('pose_topic').value,
-            self._on_pose, 10)
+        self._position_feedback = self.get_parameter(
+            'position_feedback').value
+        if self._position_feedback:
+            self._pose_sub = self.create_subscription(
+                PoseStamped, self.get_parameter('pose_topic').value,
+                self._on_pose, 10)
         self._leg_sub = self.create_subscription(
             Float32Array, self.get_parameter('leg_state_topic').value,
             self._on_leg, 100)
@@ -231,24 +244,35 @@ class JumpControlNode(Node):
     def _tick(self):
         if self._finished:
             return
-        if self._pose is None or self._leg is None:
+        if self._leg is None or (self._position_feedback
+                                 and self._pose is None):
             self._publish(np.array([0.0, 0.0, 1.0]), 'zero_thrust')
             return
 
-        p = np.array([
-            self._pose.position.x,
-            self._pose.position.y,
-            self._pose.position.z,
-        ])
-        v_xy = self._velocity_estimate()
+        if self._position_feedback:
+            p = np.array([
+                self._pose.position.x,
+                self._pose.position.y,
+                self._pose.position.z,
+            ])
+            v_xy = self._velocity_estimate()
+        else:
+            # Sensor-free hopping: no position/velocity feedback is used
+            # anywhere in the control path (paper Fig. 6 / task 8).
+            p = np.zeros(3)
+            v_xy = np.zeros(2)
         foot_z = float(self._leg[4])
         q = float(self._leg[1])
         q_dot = float(self._leg[2])
         out = self._controller.update(
             self._sim_time, p, v_xy, foot_z, q, q_dot)
         self._publish(out.z_b, out.mode)
+        stab_msg = Bool()
+        stab_msg.data = bool(out.stabilizer_active)
+        self._stabilizer_pub.publish(stab_msg)
 
         for row in self._controller.take_rows():
+            row['stabilizer_active'] = bool(out.stabilizer_active)
             self._log_row(row)
 
         if self._duration > 0.0 and self._start_time is not None:
