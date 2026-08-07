@@ -14,6 +14,7 @@
 
 """Launch Gazebo (server + GUI), spawn the quadcopter and start RViz."""
 
+import math
 import os
 import subprocess
 import tempfile
@@ -52,6 +53,12 @@ def _convert_and_spawn(context):
     else:
         spawn_z = float(context.launch_configurations['spawn_z'])
     namespace = context.launch_configurations['namespace']
+    roll = math.radians(float(
+        context.launch_configurations['spawn_roll_deg']))
+    pitch = math.radians(float(
+        context.launch_configurations['spawn_pitch_deg']))
+    yaw = math.radians(float(
+        context.launch_configurations['spawn_yaw_deg']))
 
     with tempfile.TemporaryDirectory(prefix='quadcopter_spawn_') as tmp:
         urdf_path = os.path.join(tmp, 'quadcopter.urdf')
@@ -81,6 +88,7 @@ def _convert_and_spawn(context):
         '-world', 'quadcopter_world',
         '-name', namespace,
         '-x', '0', '-y', '0', '-z', str(spawn_z),
+        '-R', str(roll), '-P', str(pitch), '-Y', str(yaw),
     ]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
@@ -129,6 +137,18 @@ def generate_launch_description():
         description=(
             'Initial foot height above the ground for a free-fall drop; '
             '0 disables the drop and spawns on the ground'),
+    )
+    declare_spawn_roll = DeclareLaunchArgument(
+        'spawn_roll_deg', default_value='0.0',
+        description='Initial roll disturbance at spawn (deg)',
+    )
+    declare_spawn_pitch = DeclareLaunchArgument(
+        'spawn_pitch_deg', default_value='0.0',
+        description='Initial pitch disturbance at spawn (deg)',
+    )
+    declare_spawn_yaw = DeclareLaunchArgument(
+        'spawn_yaw_deg', default_value='0.0',
+        description='Initial yaw at spawn (deg)',
     )
     declare_gui = DeclareLaunchArgument(
         'gui', default_value='true',
@@ -247,6 +267,9 @@ def generate_launch_description():
         declare_namespace,
         declare_spawn_z,
         declare_drop_height,
+        declare_spawn_roll,
+        declare_spawn_pitch,
+        declare_spawn_yaw,
         declare_gui,
         declare_rviz,
         set_gz_plugin_path,

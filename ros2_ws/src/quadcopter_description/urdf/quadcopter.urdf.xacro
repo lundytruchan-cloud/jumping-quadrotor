@@ -184,6 +184,19 @@
     </gazebo>
   </xacro:macro>
 
+  <!-- Aerodynamic stabilizer visual: three 39 cm^2 hinged plates (paper
+       Fig. 6A).  The plates are visual-only; the aerodynamic aligning
+       torque is applied by the dedicated gz-sim system plugin below. -->
+  <xacro:macro name="stabilizer_plate" params="idx angle">
+    <visual name="stab_plate_${idx}">
+      <origin xyz="0 0 ${body_z / 2.0 + 0.012}" rpy="0 ${pi / 2.0 - 0.30} ${angle}"/>
+      <geometry>
+        <box size="0.052 0.075 0.001"/>
+      </geometry>
+      <material name="prop_white"/>
+    </visual>
+  </xacro:macro>
+
   <!-- ================================ links ================================ -->
   <material name="black">
     <color rgba="0.12 0.12 0.12 1.0"/>
@@ -211,6 +224,9 @@
     <xacro:leg x="-0.028" y="0.028"/>
     <xacro:leg x="-0.028" y="-0.028"/>
     <xacro:leg x="0.028" y="-0.028"/>
+    <xacro:stabilizer_plate idx="0" angle="0"/>
+    <xacro:stabilizer_plate idx="1" angle="${2.0943951023931953}"/>
+    <xacro:stabilizer_plate idx="2" angle="${4.1887902047863905}"/>
     <collision name="body">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -304,6 +320,26 @@
       <l0>${leg_length0}</l0>
       <vel_eps>0.02</vel_eps>
       <topic>/model/quadcopter/leg_state</topic>
+    </plugin>
+  </gazebo>
+
+  <!-- Active aerodynamic stabilizer (paper SM Eq. S33, custom gz-sim
+       system plugin).  The ROS controller publishes
+       /quadcopter/stabilizer_cmd (Bool); the launch file bridges it to the
+       plugin topic.  When active, the plugin applies the flat-plate
+       aligning torque computed from the body's own world velocity. -->
+  <gazebo>
+    <plugin
+      filename="libaerodynamic_stabilizer_system.so"
+      name="quadcopter_gz_plugins::AerodynamicStabilizerSystem">
+      <link_name>base_link</link_name>
+      <rho>1.2</rho>
+      <surface>0.0078</surface>
+      <k_eff>8.0</k_eff>
+      <moment_arm>0.06</moment_arm>
+      <speed_eps>0.05</speed_eps>
+      <topic>/model/quadcopter/stabilizer_active</topic>
+      <diag_topic>/model/quadcopter/stabilizer_state</diag_topic>
     </plugin>
   </gazebo>
 

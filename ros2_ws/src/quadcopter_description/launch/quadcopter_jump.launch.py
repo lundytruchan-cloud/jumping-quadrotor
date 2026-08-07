@@ -37,6 +37,9 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace', default_value='quadcopter'),
         DeclareLaunchArgument('spawn_z', default_value='0.22'),
         DeclareLaunchArgument('drop_height', default_value='0.8'),
+        DeclareLaunchArgument('spawn_roll_deg', default_value='0.0'),
+        DeclareLaunchArgument('spawn_pitch_deg', default_value='0.0'),
+        DeclareLaunchArgument('spawn_yaw_deg', default_value='0.0'),
         DeclareLaunchArgument('gui', default_value='false'),
         DeclareLaunchArgument('rviz', default_value='false'),
         DeclareLaunchArgument('trajectory', default_value='spot'),
@@ -61,6 +64,10 @@ def generate_launch_description():
         DeclareLaunchArgument('rotation_time', default_value='0.25'),
         DeclareLaunchArgument('ramp_hops', default_value='3'),
         DeclareLaunchArgument('adaptive_scale', default_value='true'),
+        DeclareLaunchArgument('control_strategy', default_value='combined'),
+        DeclareLaunchArgument('position_feedback', default_value='true'),
+        DeclareLaunchArgument('no_fb_dt_pa', default_value='0.0'),
+        DeclareLaunchArgument('att_only_torque_scale', default_value='1.0'),
         DeclareLaunchArgument('log_file', default_value=''),
         DeclareLaunchArgument('attitude_log', default_value=''),
         DeclareLaunchArgument('leg_log', default_value=''),
@@ -83,6 +90,9 @@ def generate_launch_description():
             ('namespace', namespace),
             ('spawn_z', spawn_z),
             ('drop_height', drop_height),
+            ('spawn_roll_deg', LaunchConfiguration('spawn_roll_deg')),
+            ('spawn_pitch_deg', LaunchConfiguration('spawn_pitch_deg')),
+            ('spawn_yaw_deg', LaunchConfiguration('spawn_yaw_deg')),
             ('gui', gui),
             ('rviz', rviz),
         ],
@@ -114,6 +124,32 @@ def generate_launch_description():
         ],
         output='screen',
     )
+    stabilizer_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/model/quadcopter/stabilizer_active'
+            '@std_msgs/msg/Bool]gz.msgs.Boolean',
+        ],
+        remappings=[
+            ('/model/quadcopter/stabilizer_active',
+             '/quadcopter/stabilizer_cmd'),
+        ],
+        output='screen',
+    )
+    stabilizer_state_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/model/quadcopter/stabilizer_state'
+            '@ros_gz_interfaces/msg/Float32Array[gz.msgs.Float_V',
+        ],
+        remappings=[
+            ('/model/quadcopter/stabilizer_state',
+             '/quadcopter/stabilizer_state'),
+        ],
+        output='screen',
+    )
 
     controller = Node(
         package=package_name,
@@ -124,6 +160,8 @@ def generate_launch_description():
             'kp_rate': 1.2e-3,
             'ki_rate': 1.0e-3,
             'kp_att': 10.0,
+            'att_only_torque_scale': LaunchConfiguration(
+                'att_only_torque_scale'),
             'log_file': LaunchConfiguration('attitude_log'),
             'use_sim_time': True,
         }],
@@ -156,6 +194,9 @@ def generate_launch_description():
             'rotation_time': LaunchConfiguration('rotation_time'),
             'ramp_hops': LaunchConfiguration('ramp_hops'),
             'adaptive_scale': LaunchConfiguration('adaptive_scale'),
+            'control_strategy': LaunchConfiguration('control_strategy'),
+            'position_feedback': LaunchConfiguration('position_feedback'),
+            'no_fb_dt_pa': LaunchConfiguration('no_fb_dt_pa'),
             'log_file': log_file,
             'use_sim_time': True,
         }],
@@ -178,6 +219,8 @@ def generate_launch_description():
         sim_launch,
         imu_bridge,
         motor_bridge,
+        stabilizer_bridge,
+        stabilizer_state_bridge,
         controller,
         jump_controller,
         phase_node,
