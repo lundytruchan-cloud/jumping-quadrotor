@@ -62,6 +62,7 @@ class AttitudeControlNode(Node):
         self.declare_parameter('att_only_torque_scale', 1.0)
         self.declare_parameter('att_only_max_thrust', 0.25)
         self.declare_parameter('att_only_yaw_gain', 0.0)
+        self.declare_parameter('att_only_thrust_scale', 0.1)
         self.declare_parameter('imu_timeout', 0.2)
         self.declare_parameter('altitude_hold', True)
         self.declare_parameter('alt_kp', 0.6)
@@ -81,6 +82,8 @@ class AttitudeControlNode(Node):
             'att_only_max_thrust').value
         self._att_only_yaw_gain = self.get_parameter(
             'att_only_yaw_gain').value
+        self._att_only_thrust_scale = self.get_parameter(
+            'att_only_thrust_scale').value
         self._imu_timeout = self.get_parameter('imu_timeout').value
         self._altitude_hold = self.get_parameter('altitude_hold').value
         self._alt_kp = self.get_parameter('alt_kp').value
@@ -237,8 +240,8 @@ class AttitudeControlNode(Node):
             thrust_desired = 0.0
         elif self._mode == 'attitude_only':
             # Ballistic segment: keep the attitude stabilised while the
-            # thrust stays at zero (paper Eq. 34-35 thrust management:
-            # "the rest of the time thrust ~= 0").
+            # net thrust stays small (paper: "thrust of only ~mg/10 was
+            # required to obtain satisfactory attitude control performance").
             self._pid.yaw_gain = self._att_only_yaw_gain
             self._pid.yaw_rate_gain = self._att_only_yaw_gain
             torque = self._pid.update(
@@ -252,7 +255,8 @@ class AttitudeControlNode(Node):
             # resulting net thrust afterwards.
             torque = tuple(
                 self._att_only_torque_scale * t for t in torque)
-            thrust_desired = 0.0
+            thrust_desired = (
+                self._att_only_thrust_scale * self._mass * GRAVITY)
         else:
             thrust_desired = self._mass * GRAVITY
             if self._altitude_hold and self._z_target is not None:

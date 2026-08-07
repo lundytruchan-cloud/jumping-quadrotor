@@ -86,7 +86,8 @@ def test_attitude_only_mode_commands_torque_without_thrust():
     speeds = received[0].velocity
     # Attitude error must produce motor activity even with zero thrust.
     assert max(abs(s) for s in speeds) > 0.0
-    assert diag[0].data[6] == pytest.approx(0.0, abs=1e-9)
+    # The paper keeps a small descent thrust of ~mg/10 for attitude control.
+    assert diag[0].data[6] == pytest.approx(0.1 * 0.0348 * 9.80665, abs=1e-6)
 
     node.destroy_subscription(sub)
     node.destroy_subscription(diag_sub)

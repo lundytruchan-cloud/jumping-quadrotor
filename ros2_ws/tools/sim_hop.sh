@@ -50,7 +50,7 @@ EXTRA=""
 if [ "$TRAJ" = "circle" ]; then
   EXTRA="circle_radius:=0.4 circle_omega:=0.3 circle_phase0:=0.0"
 elif [ "$TRAJ" = "step" ]; then
-  EXTRA="step_targets:='0,0;0.6,0' step_hold:=2.0"
+  EXTRA="step_targets:=0,0;0.6,0 step_hold:=2.0"
 fi
 
 echo "[sim_hop] trajectory=$TRAJ hops=$HOPS z_d=${Z_D}m drop=${DROP}m"
@@ -118,10 +118,11 @@ ANALYZE_EXTRA=""
 if [ "$TRAJ" = "circle" ]; then
   ANALYZE_EXTRA="--radius 0.4 --omega 0.3"
 elif [ "$TRAJ" = "step" ]; then
-  ANALYZE_EXTRA="--targets '0,0;0.6,0' --hold 2.0"
+  ANALYZE_EXTRA="--targets 0,0;0.6,0 --hold 2.0"
 fi
 python3 ../scripts/task7_analyze_hop.py \
   --csv "$CSV" \
+  --attitude-csv "$ATT_LOG" \
   --trajectory "$TRAJ" \
   --desired-height "$Z_D" \
   --num-hops "$HOPS" \

@@ -114,7 +114,8 @@ class JumpController:
                  max_dt_pa=0.8, spin_up_comp=0.05, params=PAPER_PARAMS,
                  max_tilt_deg=18.0, tilt_scale=1.0, fb_gain=0.0,
                  fb_clamp=0.25, fixed_tilt_deg=0.0, max_speed=1.5,
-                 max_step=0.25, rotation_time=0.25, ramp_hops=3):
+                 max_step=0.25, rotation_time=0.25, ramp_hops=3,
+                 adaptive_scale=True):
         self.desired_height = float(desired_height)
         self.l0 = float(l0)
         self.g = float(g)
@@ -133,6 +134,7 @@ class JumpController:
         self.max_step = float(max_step)
         self.rotation_time = float(rotation_time)
         self.ramp_hops = int(ramp_hops)
+        self.adaptive_scale = bool(adaptive_scale)
 
         def default_plan(p_apex, v_apex, p_des, z_d):
             return solve_landing_attitude(
@@ -321,7 +323,11 @@ class JumpController:
                 e3, self.l0, self.g).t_fall
         except ValueError:
             t_fall_est = 0.0
-        t_land_next = t + t_fall_est + dt_pa_next + dt_pj_next
+        # Paper Eq. 33: the next landing time is the current time-to-landing
+        # plus one full ballistic cycle at the setpoint altitude.
+        t_land_next = (
+            t + t_fall_est
+            + 2.0 * np.sqrt(2.0 * self.desired_height / self.g))
         p_des = np.asarray(self._ref_fn(t_land_next), dtype=float)
         # Soft start: scale the first reference displacements so the robot
         # joins the trajectory without building up a large horizontal speed
@@ -417,7 +423,7 @@ class JumpController:
             self._landing_ref_k = None
         # Online gain calibration: compare the displacement predicted by the
         # previous plan with the displacement actually achieved.
-        if self._prev_plan is not None:
+        if self._prev_plan is not None and self.adaptive_scale:
             model_disp = (
                 self._prev_plan.p_landing_next_pred
                 - self._prev_plan.p_landing_k)

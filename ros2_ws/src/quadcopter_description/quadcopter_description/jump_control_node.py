@@ -88,6 +88,7 @@ class JumpControlNode(Node):
         self.declare_parameter('max_step', 0.25)
         self.declare_parameter('rotation_time', 0.25)
         self.declare_parameter('ramp_hops', 3)
+        self.declare_parameter('adaptive_scale', True)
         self.declare_parameter('l0', 0.22)
         self.declare_parameter('g', 9.80665)
         self.declare_parameter('log_file', '')
@@ -146,6 +147,7 @@ class JumpControlNode(Node):
             max_step=self.get_parameter('max_step').value,
             rotation_time=self.get_parameter('rotation_time').value,
             ramp_hops=self.get_parameter('ramp_hops').value,
+            adaptive_scale=self.get_parameter('adaptive_scale').value,
             ref_fn=ref_fn,
         )
 
