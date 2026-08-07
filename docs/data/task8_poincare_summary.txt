@@ -1,0 +1,4 @@
+hopping_height_m 0.5
+max_abs_diff_vs_authors_deg 0.000000
+stable_fraction_full_grid 0.1358
+stable_fraction_between_dashed_lines 0.7549

@@ -60,5 +60,12 @@ Thumbs.db
 !docs/data/task7_*.png
 !docs/data/task7_*.csv
 
+# task8 aerodynamic-stabilizer assets (intentionally committed)
+!docs/data/task8_*.png
+!docs/data/task8_*.csv
+# raw stabilizer topic stream (large diagnostic dump; redundant with the
+# stabilizer_active column of the jump CSV)
+docs/data/task8_*_stabilizer.csv
+
 # raw Zenodo data (downloaded on demand, not committed)
 /data/

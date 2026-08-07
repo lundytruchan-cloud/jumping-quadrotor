@@ -1,0 +1,9 @@
+type,cycle,t_takeoff,p_takeoff_x,p_takeoff_y,p_takeoff_z,vz_est,dt_pa,t_apex,p_apex_x,p_apex_y,z_apex,z_d,t_land_pred,p_des_x,p_des_y,z_b_ld_x,z_b_ld_y,z_b_ld_z,z_b_to_x,z_b_to_y,z_b_to_z,p_land_next_x,p_land_next_y,dt_pa_next,dt_pj_next,t_landing,p_land_x,p_land_y,p_land_z,err_xy_pred,err_ref,tilt_corr_x,tilt_corr_y,tilt_scale,stabilizer_active,error
+landing,0,,,,,,,,,,,,,,,,,,,,,,,,,2.51,0.0,0.0,0.0,nan,nan,0.0,0.0,1.0,True,
+cycle,1,2.56,0.0,0.0,0.0,3.1315571206669692,0.15,,,,,,,,,,,,,,,,,,,,,,,,,,,,True,
+landing,1,,,,,,,,,,,,,,,,,,,,,,,,,3.58,0.0,0.0,0.0,nan,nan,0.0,0.0,1.0,True,
+cycle,2,3.63,0.0,0.0,0.0,1.279767825,0.15,,,,,,,,,,,,,,,,,,,,,,,,,,,,True,
+landing,2,,,,,,,,,,,,,,,,,,,,,,,,,4.68,0.0,0.0,0.0,nan,nan,0.0,0.0,1.0,True,
+cycle,3,4.73,0.0,0.0,0.0,2.2197352274999993,0.15,,,,,,,,,,,,,,,,,,,,,,,,,,,,True,
+landing,3,,,,,,,,,,,,,,,,,,,,,,,,,5.33,0.0,0.0,0.0,nan,nan,0.0,0.0,1.0,True,
+landing,3,,,,,,,,,,,,,,,,,,,,,,,,,5.41,0.0,0.0,0.0,nan,nan,0.0,0.0,1.0,True,
