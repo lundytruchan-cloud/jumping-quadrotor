@@ -1,8 +1,11 @@
 metric,value,threshold,ok
 takeoffs,10,10,True
-landing_rmse_m,0.491,0.80,True
+landing_rmse_m,0.289,0.80,True
 segment_landings,6,,
-segment_rmse_m,0.296,,
-landing_max_err_m,1.052,,
-height_rmse_m,0.057,0.12,True
+segment_rmse_m,0.232,,
+paper_lateral_rmse_m,0.386,,
+jump_period_s,0.787,,
+reference_delay_s,1.180,,
+landing_max_err_m,0.518,,
+height_rmse_m,0.066,0.12,True
 overall,PASS,,
