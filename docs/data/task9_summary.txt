@@ -1,0 +1,42 @@
+======================================================================
+Task 9 benchmark summary
+======================================================================
+
+Paper Fig.4A (author hopping_agility.m reprocessed):
+  window | h_mean (m) | T_mean (s) | f_mean (Hz) | nu=2hf (m/s)
+   1     |    1.627 |    1.357 |    0.737 |    2.398
+   2     |    1.498 |    1.291 |    0.775 |    2.321
+   3     |    1.333 |    1.218 |    0.821 |    2.190
+   4     |    1.150 |    1.130 |    0.885 |    2.036
+   5     |    0.961 |    1.039 |    0.963 |    1.851
+   6     |    0.764 |    0.932 |    1.073 |    1.640
+   7     |    0.588 |    0.832 |    1.202 |    1.414
+
+Simulation (steady cycles >= 2):
+  setpoint | h_mean (m) | T_mean (s) | f_mean (Hz) | nu=2hf (m/s)
+        0.6 |    0.555 |    0.780 |    1.288 |    1.430
+        0.8 |    0.752 |    0.910 |    1.102 |    1.656
+        1.0 |    0.947 |    0.997 |    1.005 |    1.904
+        1.2 |    1.122 |    1.097 |    0.913 |    2.050
+        1.4 |    1.305 |    1.175 |    0.853 |    2.226
+       1.63 |    1.526 |    1.278 |    0.782 |    2.387
+
+Hover reference P_omega3 = 1.9051e+10 (rel. 1.0)
+  h=0.555 m: duty_full=0.089, endurance x11.20, duty_steady=0.098
+  h=0.752 m: duty_full=0.098, endurance x10.16, duty_steady=0.107
+  h=0.947 m: duty_full=0.099, endurance x10.05, duty_steady=0.107
+  h=1.122 m: duty_full=0.103, endurance x9.69, duty_steady=0.111
+  h=1.305 m: duty_full=0.108, endurance x9.27, duty_steady=0.115
+  h=1.526 m: duty_full=0.102, endurance x9.82, duty_steady=0.108
+
+Paper duty ratio D = mean(sum(f_i))/mg (endurance test definition):
+  h=0.555 m: D_full=0.149, D_steady=0.157, frac(Σf<0.11mg)=0.939
+  h=0.752 m: D_full=0.158, D_steady=0.166, frac(Σf<0.11mg)=0.930
+  h=0.947 m: D_full=0.159, D_steady=0.167, frac(Σf<0.11mg)=0.929
+  h=1.122 m: D_full=0.163, D_steady=0.170, frac(Σf<0.11mg)=0.925
+  h=1.305 m: D_full=0.167, D_steady=0.175, frac(Σf<0.11mg)=0.921
+  h=1.526 m: D_full=0.162, D_steady=0.168, frac(Σf<0.11mg)=0.927
+
+Trajectory RMSE (task-7 data, paper protocol):
+  circle: paper-lateral 0.227 m, landing 0.310 m, height 0.057 m
+  step: paper-lateral 0.386 m, landing 0.289 m, height 0.066 m
