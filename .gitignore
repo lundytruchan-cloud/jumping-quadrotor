@@ -30,9 +30,47 @@ venv/
 *.mp4
 recordings/
 
+# 任务三有意提交的截图与渲染图（豁免 *.png）
+!docs/task3_*.png
+!docs/data/task3_photos/
+!docs/data/task3_photos/*.png
+
 # IDE / 系统
 .idea/
 .vscode/
 *.swp
 Thumbs.db
 .DS_Store
+
+# task4 figures (intentionally committed)
+!docs/data/task4_*.png
+
+# task5 drop-test assets (intentionally committed)
+!docs/task5_*.png
+!docs/data/task5_*.png
+!docs/data/task5_*.csv
+!docs/data/task5_photos/
+!docs/data/task5_photos/*.png
+
+# task6 attitude-control assets (intentionally committed)
+!docs/data/task6_*.png
+!docs/data/task6_*.csv
+
+# task7 jumping-controller assets (intentionally committed)
+!docs/data/task7_*.png
+!docs/data/task7_*.csv
+
+# task8 aerodynamic-stabilizer assets (intentionally committed)
+!docs/data/task8_*.png
+!docs/data/task8_*.csv
+# raw stabilizer topic stream (large diagnostic dump; redundant with the
+# stabilizer_active column of the jump CSV)
+docs/data/task8_*_stabilizer.csv
+
+# task9 performance-benchmark assets (intentionally committed)
+!docs/data/task9_*.png
+# raw leg-state telemetry (large, regenerable; jump/attitude CSVs suffice)
+docs/data/task9_*_leg.csv
+
+# raw Zenodo data (downloaded on demand, not committed)
+/data/

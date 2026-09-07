@@ -1,0 +1,373 @@
+<?xml version="1.0"?>
+<!--
+  Crazyflie 2.1 inspired quadcopter model.
+
+  Reference dimensions / mass (Crazyflie 2.1):
+    - total mass                27 g
+    - diagonal wheelbase        92 mm
+    - propeller diameter        45 mm
+    - motor size                7 x 6 mm
+
+  The model is a simplified rigid-body representation for Gazebo + RViz:
+    base_link (body + arms + legs) and four propeller links driven by
+    continuous revolute joints.  The built-in Gazebo system plugin
+    gz::sim::systems::MulticopterMotorModel turns the propellers and applies
+    thrust / reaction torque from motor speed commands.
+
+  Motor model constants are order-of-magnitude estimates for a 27 g
+  quadcopter (hover around 2/3 of max rotor speed); they will be calibrated
+  together with the attitude controller in task 6.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="quadcopter">
+
+  <!-- ============================== parameters ============================= -->
+  <!-- Geometry (SI units) -->
+  <xacro:property name="wheelbase_diag" value="0.092"/>
+  <xacro:property name="arm_length" value="${wheelbase_diag / 2.0}"/>
+  <xacro:property name="motor_xy" value="0.032527"/>
+  <xacro:property name="body_x" value="0.030"/>
+  <xacro:property name="body_y" value="0.030"/>
+  <xacro:property name="body_z" value="0.012"/>
+  <xacro:property name="motor_radius" value="0.0035"/>
+  <xacro:property name="motor_height" value="0.006"/>
+  <xacro:property name="prop_radius" value="0.0225"/>
+  <xacro:property name="prop_thickness" value="0.001"/>
+  <xacro:property name="leg_length" value="0.035"/>
+  <xacro:property name="leg_radius" value="0.0015"/>
+  <xacro:property name="arm_radius" value="0.002"/>
+  <xacro:property name="motor_z" value="${body_z / 2.0 + motor_height / 2.0}"/>
+
+  <!-- Hopcopter passive telescopic leg (paper Eq. 7 / table S2) -->
+  <xacro:property name="leg_length0" value="0.22"/>
+  <xacro:property name="leg_preload" value="0.0197"/>
+  <xacro:property name="mass_total" value="0.0348"/>
+  <xacro:property name="foot_mass" value="0.001"/>
+  <xacro:property name="k_over_m" value="5000.0"/>
+  <xacro:property name="f_c_over_m" value="12.7"/>
+  <xacro:property name="spring_k" value="${k_over_m * mass_total}"/>
+  <xacro:property name="spring_f_c" value="${f_c_over_m * mass_total}"/>
+
+  <!-- Mass (kg); total = 0.0348 = base + 4 props + foot -->
+  <xacro:property name="mass_base"
+                  value="${mass_total - 4.0 * mass_prop_link - foot_mass}"/>
+  <xacro:property name="mass_prop_link" value="0.00275"/>
+
+  <!-- Motor model (calibrated in task 6):
+       force = motor_constant * speed^2,  torque = moment_constant * force.
+       Hover needs ~2/3 max speed; moment_constant matches the Crazyflie
+       torque/thrust ratio (~0.006 m). -->
+  <xacro:property name="max_rot_velocity" value="2200.0"/>
+  <xacro:property name="motor_constant" value="3.0e-8"/>
+  <xacro:property name="moment_constant" value="0.006"/>
+  <xacro:property name="time_constant_up" value="0.02"/>
+  <xacro:property name="time_constant_down" value="0.04"/>
+
+  <!-- Arm visual yaw for each diagonal direction -->
+  <xacro:property name="yaw_0" value="0.7853981633974483"/>
+  <xacro:property name="yaw_1" value="2.356194490192345"/>
+  <xacro:property name="yaw_2" value="3.9269908169872414"/>
+  <xacro:property name="yaw_3" value="5.497787143782138"/>
+
+  <!-- ================================ macros =============================== -->
+  <xacro:macro name="box_inertia" params="mass x y z">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${mass / 12.0 * (y * y + z * z)}"
+        ixy="0.0" ixz="0.0"
+        iyy="${mass / 12.0 * (x * x + z * z)}"
+        iyz="0.0"
+        izz="${mass / 12.0 * (x * x + y * y)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cylinder_inertia" params="mass radius length">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${mass / 12.0 * (3.0 * radius * radius + length * length)}"
+        ixy="0.0" ixz="0.0"
+        iyy="${mass / 12.0 * (3.0 * radius * radius + length * length)}"
+        iyz="0.0"
+        izz="${mass * radius * radius / 2.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- Arm visual: thin cylinder from body center towards motor (x, y) -->
+  <xacro:macro name="arm_visual" params="x y yaw">
+    <visual name="arm_${yaw}">
+      <origin xyz="${x / 2.0} ${y / 2.0} 0" rpy="0 ${pi / 2.0} ${yaw}"/>
+      <geometry>
+        <cylinder radius="${arm_radius}" length="${arm_length - 0.006}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </xacro:macro>
+
+  <!-- Leg: vertical cylinder below the body corner (visual + collision) -->
+  <xacro:macro name="leg" params="x y">
+    <visual name="leg_${x}_${y}">
+      <origin xyz="${x} ${y} ${-body_z / 2.0 - leg_length / 2.0}"
+              rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${leg_radius}" length="${leg_length}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision name="leg_${x}_${y}">
+      <origin xyz="${x} ${y} ${-body_z / 2.0 - leg_length / 2.0}"
+              rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${leg_radius}" length="${leg_length}"/>
+      </geometry>
+    </collision>
+  </xacro:macro>
+
+  <!-- One motor + propeller link and its continuous revolute joint -->
+  <xacro:macro name="motor_prop" params="idx x y yaw turning">
+    <link name="prop${idx}_link">
+      <visual name="motor">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${motor_radius}" length="${motor_height}"/>
+        </geometry>
+        <material name="gray"/>
+      </visual>
+      <visual name="propeller">
+        <origin xyz="0 0 ${motor_height / 2.0 + prop_thickness / 2.0}"
+                rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${prop_radius}" length="${prop_thickness}"/>
+        </geometry>
+        <material name="prop_white"/>
+      </visual>
+      <collision name="motor">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${motor_radius}" length="${motor_height}"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertia mass="${mass_prop_link}"
+                              radius="${motor_radius}"
+                              length="${motor_height}"/>
+    </link>
+
+    <joint name="prop${idx}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="prop${idx}_link"/>
+      <origin xyz="${x} ${y} ${motor_z}" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <gazebo>
+      <plugin
+        filename="gz-sim-multicopter-motor-model-system"
+        name="gz::sim::systems::MulticopterMotorModel">
+        <robotNamespace>quadcopter</robotNamespace>
+        <jointName>prop${idx}_joint</jointName>
+        <linkName>prop${idx}_link</linkName>
+        <turningDirection>${turning}</turningDirection>
+        <timeConstantUp>${time_constant_up}</timeConstantUp>
+        <timeConstantDown>${time_constant_down}</timeConstantDown>
+        <maxRotVelocity>${max_rot_velocity}</maxRotVelocity>
+        <motorConstant>${motor_constant}</motorConstant>
+        <momentConstant>${moment_constant}</momentConstant>
+        <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+        <actuator_number>${idx}</actuator_number>
+        <rotorDragCoefficient>0</rotorDragCoefficient>
+        <rollingMomentCoefficient>0</rollingMomentCoefficient>
+        <motorSpeedPubTopic>motor_speed/${idx}</motorSpeedPubTopic>
+        <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
+        <motorType>velocity</motorType>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Aerodynamic stabilizer visual: three 39 cm^2 hinged plates (paper
+       Fig. 6A).  The plates are visual-only; the aerodynamic aligning
+       torque is applied by the dedicated gz-sim system plugin below. -->
+  <xacro:macro name="stabilizer_plate" params="idx angle">
+    <visual name="stab_plate_${idx}">
+      <origin xyz="0 0 ${body_z / 2.0 + 0.012}" rpy="0 ${pi / 2.0 - 0.30} ${angle}"/>
+      <geometry>
+        <box size="0.052 0.075 0.001"/>
+      </geometry>
+      <material name="prop_white"/>
+    </visual>
+  </xacro:macro>
+
+  <!-- ================================ links ================================ -->
+  <material name="black">
+    <color rgba="0.12 0.12 0.12 1.0"/>
+  </material>
+  <material name="gray">
+    <color rgba="0.45 0.45 0.45 1.0"/>
+  </material>
+  <material name="prop_white">
+    <color rgba="0.90 0.90 0.90 1.0"/>
+  </material>
+
+  <link name="base_link">
+    <visual name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${body_x} ${body_y} ${body_z}"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+    <xacro:arm_visual x="${motor_xy}" y="${motor_xy}" yaw="${yaw_0}"/>
+    <xacro:arm_visual x="${-motor_xy}" y="${motor_xy}" yaw="${yaw_1}"/>
+    <xacro:arm_visual x="${-motor_xy}" y="${-motor_xy}" yaw="${yaw_2}"/>
+    <xacro:arm_visual x="${motor_xy}" y="${-motor_xy}" yaw="${yaw_3}"/>
+    <xacro:leg x="0.028" y="0.028"/>
+    <xacro:leg x="-0.028" y="0.028"/>
+    <xacro:leg x="-0.028" y="-0.028"/>
+    <xacro:leg x="0.028" y="-0.028"/>
+    <xacro:stabilizer_plate idx="0" angle="0"/>
+    <xacro:stabilizer_plate idx="1" angle="${2.0943951023931953}"/>
+    <xacro:stabilizer_plate idx="2" angle="${4.1887902047863905}"/>
+    <collision name="body">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${body_x} ${body_y} ${body_z}"/>
+      </geometry>
+    </collision>
+    <xacro:box_inertia mass="${mass_base}" x="${body_x}"
+                       y="${body_y}" z="${body_z}"/>
+  </link>
+
+  <!-- Central monopedal telescopic leg: foot_link slides along body z.
+       q = 0 corresponds to the rest length l0 = 0.22 m (mechanical stop);
+       compression moves the foot towards the body (q < 0). -->
+  <link name="foot_link">
+    <visual name="leg_rod">
+      <origin xyz="0 0 ${leg_length0 / 2.0}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${leg_radius}" length="${leg_length0}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <visual name="foot_tip">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.004"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+    <collision name="foot_tip">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.004"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${foot_mass}"/>
+      <inertia
+        ixx="${0.4 * foot_mass * 0.004 * 0.004}"
+        ixy="0.0" ixz="0.0"
+        iyy="${0.4 * foot_mass * 0.004 * 0.004}"
+        iyz="0.0"
+        izz="${0.4 * foot_mass * 0.004 * 0.004}"/>
+    </inertial>
+  </link>
+
+  <joint name="leg_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="foot_link"/>
+    <origin xyz="0 0 ${-leg_length0}" rpy="0 0 0"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-0.16" upper="0.0" effort="100.0" velocity="10.0"/>
+    <dynamics damping="0.0" friction="0.0"/>
+  </joint>
+
+  <!-- Adjacent rotors spin in opposite directions so roll and yaw torques are
+       independent (standard X4 layout: CCW, CW, CCW, CW). -->
+  <xacro:motor_prop idx="0" x="${motor_xy}" y="${motor_xy}"
+                    yaw="${yaw_0}" turning="ccw"/>
+  <xacro:motor_prop idx="1" x="${-motor_xy}" y="${motor_xy}"
+                    yaw="${yaw_1}" turning="cw"/>
+  <xacro:motor_prop idx="2" x="${-motor_xy}" y="${-motor_xy}"
+                    yaw="${yaw_2}" turning="ccw"/>
+  <xacro:motor_prop idx="3" x="${motor_xy}" y="${-motor_xy}"
+                    yaw="${yaw_3}" turning="cw"/>
+
+  <!-- Publish propeller joint states for RViz / ROS tools -->
+  <gazebo>
+    <plugin
+      filename="gz-sim-joint-state-publisher-system"
+      name="gz::sim::systems::JointStatePublisher">
+      <update_rate>500</update_rate>
+      <joint_name>prop0_joint</joint_name>
+      <joint_name>prop1_joint</joint_name>
+      <joint_name>prop2_joint</joint_name>
+      <joint_name>prop3_joint</joint_name>
+      <joint_name>leg_joint</joint_name>
+    </plugin>
+  </gazebo>
+
+  <!-- Passive spring-damper leg (paper Eq. 7, custom gz-sim system plugin).
+       Forces are applied at the physics rate; state is published at 1 kHz. -->
+  <gazebo>
+    <plugin
+      filename="libspring_damper_leg_system.so"
+      name="quadcopter_gz_plugins::SpringDamperLegSystem">
+      <leg_joint>leg_joint</leg_joint>
+      <foot_link>foot_link</foot_link>
+      <k>${spring_k}</k>
+      <f_c>${spring_f_c}</f_c>
+      <l_p>${leg_preload}</l_p>
+      <l0>${leg_length0}</l0>
+      <vel_eps>0.02</vel_eps>
+      <topic>/model/quadcopter/leg_state</topic>
+    </plugin>
+  </gazebo>
+
+  <!-- Active aerodynamic stabilizer (paper SM Eq. S33, custom gz-sim
+       system plugin).  The ROS controller publishes
+       /quadcopter/stabilizer_cmd (Bool); the launch file bridges it to the
+       plugin topic.  When active, the plugin applies the flat-plate
+       aligning torque computed from the body's own world velocity. -->
+  <gazebo>
+    <plugin
+      filename="libaerodynamic_stabilizer_system.so"
+      name="quadcopter_gz_plugins::AerodynamicStabilizerSystem">
+      <link_name>base_link</link_name>
+      <rho>1.2</rho>
+      <surface>0.0078</surface>
+      <k_eff>8.0</k_eff>
+      <moment_arm>0.06</moment_arm>
+      <speed_eps>0.05</speed_eps>
+      <topic>/model/quadcopter/stabilizer_active</topic>
+      <diag_topic>/model/quadcopter/stabilizer_state</diag_topic>
+    </plugin>
+  </gazebo>
+
+  <!-- Publish the model pose (used by the RViz TF pipeline) -->
+  <gazebo>
+    <plugin
+      filename="gz-sim-pose-publisher-system"
+      name="gz::sim::systems::PosePublisher">
+      <publish_model_pose>true</publish_model_pose>
+      <publish_link_pose>false</publish_link_pose>
+      <update_frequency>100</update_frequency>
+      <static_publisher>false</static_publisher>
+    </plugin>
+  </gazebo>
+
+  <!-- IMU on the body: quaternion + angular velocity for the attitude loop -->
+  <gazebo reference="base_link">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>1</always_on>
+      <update_rate>500</update_rate>
+      <visualize>false</visualize>
+      <imu>
+        <orientation_reference_frame>ENU</orientation_reference_frame>
+      </imu>
+      <plugin
+        filename="gz-sim-imu-system"
+        name="gz::sim::systems::Imu"/>
+    </sensor>
+  </gazebo>
+
+</robot>

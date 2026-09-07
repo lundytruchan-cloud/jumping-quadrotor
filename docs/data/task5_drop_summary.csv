@@ -1,0 +1,17 @@
+metric,value
+drop_height_m,0.4999901950000001
+impact_speed_m_s,3.127168655
+impact_speed_fit_m_s,2.871399268102426
+impact_speed_theory_m_s,3.1320612423610115
+support_time_ms,30.999898999999775
+paper_support_time_ms,32.0
+support_tolerance_pct,20.0
+support_pass,True
+leg_stretch_cm,4.814559599999998
+leg_compression_cm,2.844559599999999
+paper_stretch_range_cm,4.7-5.5
+stretch_pass,True
+model_support_time_ms,32.23033749093415
+model_leg_stretch_cm,4.69620641929496
+t_LD_s,2.440000057
+t_TO_s,2.470999956

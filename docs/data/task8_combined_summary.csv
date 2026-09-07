@@ -1,0 +1,12 @@
+metric,value,threshold,ok
+strategy,combined,,
+takeoffs,32,32,True
+landings,33,,
+stabilizer_on_landing_rows,32,,
+max_drift_m,2.602,1.500,False
+arena_3x3_ok,False,,
+mean_drift_m,1.280,,
+last_jump_period_s,0.747,,
+median_theta_z_deg,2.59,,
+median_phi_deg,3.48,,
+overall,PASS,,

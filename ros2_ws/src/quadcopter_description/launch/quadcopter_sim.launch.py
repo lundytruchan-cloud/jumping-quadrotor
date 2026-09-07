@@ -1,0 +1,286 @@
+# Copyright 2026 Larry
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Launch Gazebo (server + GUI), spawn the quadcopter and start RViz."""
+
+import math
+import os
+import subprocess
+import tempfile
+
+from ament_index_python.packages import get_package_prefix
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import (
+    AppendEnvironmentVariable,
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    OpaqueFunction,
+    TimerAction,
+)
+from launch.conditions import IfCondition
+from launch.substitutions import (
+    LaunchConfiguration,
+    PathJoinSubstitution,
+)
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+package_name = 'quadcopter_description'
+plugins_package = 'quadcopter_gz_plugins'
+#: Rest length of the central telescopic leg (foot tip to body centre).
+LEG_L0 = 0.22
+
+
+def _convert_and_spawn(context):
+    """Expand xacro to URDF, convert to SDF and create the model in Gazebo."""
+    package_share = get_package_share_directory(package_name)
+    xacro_path = os.path.join(package_share, 'urdf', 'quadcopter.urdf.xacro')
+    drop_height = float(context.launch_configurations['drop_height'])
+    if drop_height > 0.0:
+        spawn_z = drop_height + LEG_L0
+    else:
+        spawn_z = float(context.launch_configurations['spawn_z'])
+    namespace = context.launch_configurations['namespace']
+    roll = math.radians(float(
+        context.launch_configurations['spawn_roll_deg']))
+    pitch = math.radians(float(
+        context.launch_configurations['spawn_pitch_deg']))
+    yaw = math.radians(float(
+        context.launch_configurations['spawn_yaw_deg']))
+
+    with tempfile.TemporaryDirectory(prefix='quadcopter_spawn_') as tmp:
+        urdf_path = os.path.join(tmp, 'quadcopter.urdf')
+        xacro = subprocess.run(
+            ['xacro', xacro_path, '-o', urdf_path],
+            capture_output=True,
+            text=True,
+        )
+        if xacro.returncode != 0:
+            raise RuntimeError(
+                'xacro failed: {}'.format(xacro.stderr.strip()))
+
+        converted = subprocess.run(
+            ['gz', 'sdf', '-p', urdf_path],
+            capture_output=True,
+            text=True,
+        )
+        if converted.returncode != 0:
+            raise RuntimeError(
+                'gz sdf conversion failed: {}'
+                .format(converted.stderr.strip()))
+        sdf_string = converted.stdout
+
+    command = [
+        'ros2', 'run', 'ros_gz_sim', 'create',
+        '-string', sdf_string,
+        '-world', 'quadcopter_world',
+        '-name', namespace,
+        '-x', '0', '-y', '0', '-z', str(spawn_z),
+        '-R', str(roll), '-P', str(pitch), '-Y', str(yaw),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            'Spawn failed: {}'.format(result.stderr.strip()))
+    return []
+
+
+def _robot_state_publisher(context):
+    """Expand the xacro model and start robot_state_publisher with it."""
+    package_share = get_package_share_directory(package_name)
+    xacro_path = os.path.join(package_share, 'urdf', 'quadcopter.urdf.xacro')
+    expanded = subprocess.run(
+        ['xacro', xacro_path], capture_output=True, text=True)
+    if expanded.returncode != 0:
+        raise RuntimeError(
+            'xacro failed: {}'.format(expanded.stderr.strip()))
+    return [Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        parameters=[{
+            'robot_description': expanded.stdout,
+            'use_sim_time': True,
+        }],
+    )]
+
+
+def generate_launch_description():
+    declare_world = DeclareLaunchArgument(
+        'world',
+        default_value=PathJoinSubstitution([
+            FindPackageShare(package_name), 'worlds',
+            'quadcopter_world.sdf']),
+        description='Gazebo world SDF file',
+    )
+    declare_namespace = DeclareLaunchArgument(
+        'namespace', default_value='quadcopter',
+        description='Model name used to spawn and for topic names',
+    )
+    declare_spawn_z = DeclareLaunchArgument(
+        'spawn_z', default_value='0.22',
+        description='Body height so the central leg rests on the ground',
+    )
+    declare_drop_height = DeclareLaunchArgument(
+        'drop_height', default_value='0.0',
+        description=(
+            'Initial foot height above the ground for a free-fall drop; '
+            '0 disables the drop and spawns on the ground'),
+    )
+    declare_spawn_roll = DeclareLaunchArgument(
+        'spawn_roll_deg', default_value='0.0',
+        description='Initial roll disturbance at spawn (deg)',
+    )
+    declare_spawn_pitch = DeclareLaunchArgument(
+        'spawn_pitch_deg', default_value='0.0',
+        description='Initial pitch disturbance at spawn (deg)',
+    )
+    declare_spawn_yaw = DeclareLaunchArgument(
+        'spawn_yaw_deg', default_value='0.0',
+        description='Initial yaw at spawn (deg)',
+    )
+    declare_gui = DeclareLaunchArgument(
+        'gui', default_value='true',
+        description='Whether to start the Gazebo GUI',
+    )
+    declare_rviz = DeclareLaunchArgument(
+        'rviz', default_value='true',
+        description='Whether to start RViz',
+    )
+
+    world = LaunchConfiguration('world')
+    gui = LaunchConfiguration('gui')
+    rviz = LaunchConfiguration('rviz')
+
+    gz_plugins_path = os.path.join(
+        get_package_prefix(plugins_package), 'lib')
+    set_gz_plugin_path = AppendEnvironmentVariable(
+        'GZ_SIM_SYSTEM_PLUGIN_PATH', gz_plugins_path)
+
+    gazebo_server = ExecuteProcess(
+        cmd=['gz', 'sim', '-s', '-r', world, '-v', '3'],
+        output='screen',
+    )
+    gazebo_gui = ExecuteProcess(
+        cmd=['gz', 'sim', '-g', '-r'],
+        output='screen',
+        condition=IfCondition(gui),
+    )
+
+    spawn_entity = TimerAction(
+        period=3.0,
+        actions=[OpaqueFunction(function=_convert_and_spawn)],
+    )
+
+    robot_state_publisher = OpaqueFunction(
+        function=_robot_state_publisher)
+
+    clock_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/world/quadcopter_world/clock'
+            '@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+        ],
+        remappings=[
+            ('/world/quadcopter_world/clock', '/clock'),
+        ],
+        output='screen',
+    )
+    joint_state_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/world/quadcopter_world/model/quadcopter/joint_state'
+            '@sensor_msgs/msg/JointState[gz.msgs.Model',
+        ],
+        remappings=[
+            ('/world/quadcopter_world/model/quadcopter/joint_state',
+             '/joint_states'),
+        ],
+        output='screen',
+    )
+    pose_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/model/quadcopter/pose'
+            '@geometry_msgs/msg/PoseStamped[gz.msgs.Pose',
+        ],
+        remappings=[
+            ('/model/quadcopter/pose', '/quadcopter/pose'),
+        ],
+        output='screen',
+    )
+
+    leg_state_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/model/quadcopter/leg_state'
+            '@ros_gz_interfaces/msg/Float32Array[gz.msgs.Float_V',
+        ],
+        remappings=[
+            ('/model/quadcopter/leg_state', '/quadcopter/leg_state'),
+        ],
+        output='screen',
+    )
+
+    pose_tf = Node(
+        package=package_name,
+        executable='quadcopter_pose_tf',
+        parameters=[{
+            'pose_topic': '/quadcopter/pose',
+            'parent_frame': 'world',
+            'child_frame': 'base_link',
+            'use_sim_time': True,
+        }],
+        output='screen',
+    )
+
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        arguments=[
+            '-d',
+            PathJoinSubstitution([
+                FindPackageShare(package_name), 'config',
+                'quadcopter.rviz']),
+        ],
+        parameters=[{'use_sim_time': True}],
+        condition=IfCondition(rviz),
+    )
+
+    return LaunchDescription([
+        declare_world,
+        declare_namespace,
+        declare_spawn_z,
+        declare_drop_height,
+        declare_spawn_roll,
+        declare_spawn_pitch,
+        declare_spawn_yaw,
+        declare_gui,
+        declare_rviz,
+        set_gz_plugin_path,
+        gazebo_server,
+        TimerAction(period=1.0, actions=[gazebo_gui]),
+        spawn_entity,
+        clock_bridge,
+        joint_state_bridge,
+        pose_bridge,
+        leg_state_bridge,
+        robot_state_publisher,
+        pose_tf,
+        rviz_node,
+    ])

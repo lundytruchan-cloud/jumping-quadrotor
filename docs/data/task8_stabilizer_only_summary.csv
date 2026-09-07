@@ -1,0 +1,12 @@
+metric,value,threshold,ok
+strategy,stabilizer_only,,
+takeoffs,3,12,False
+landings,4,,
+stabilizer_on_landing_rows,4,,
+max_drift_m,2.124,1.500,False
+arena_3x3_ok,False,,
+mean_drift_m,0.606,,
+last_jump_period_s,1.085,,
+median_theta_z_deg,2.69,,
+median_phi_deg,-4.07,,
+overall,FAIL,,
